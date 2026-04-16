@@ -9,27 +9,25 @@
 body { background:#0e0e0e; color:#fff; font-family:Arial; padding:20px; }
 h1 { color:#c8f060; }
 
-.section {
-  border:1px solid #333;
-  border-radius:8px;
-  padding:15px;
-  margin-bottom:20px;
-}
-
+.section { border:1px solid #333; padding:15px; margin-bottom:20px; border-radius:8px; }
 .exercise { margin-bottom:15px; }
 
-input { padding:6px; margin:4px; }
-button {
-  padding:6px 10px;
-  background:#c8f060;
-  border:none;
-  cursor:pointer;
-}
+input { margin:3px; padding:6px; }
+button { background:#c8f060; border:none; padding:6px 10px; cursor:pointer; }
 
 .log { font-size:12px; color:#aaa; }
-.warm { color:#888; }
+.warm { color:#666; }
+
 .good { color:#8cff8c; }
-.bad { color:#ff8c8c; }
+.warn { color:#ffd166; }
+.bad { color:#ff6b6b; }
+
+.bar { height:6px; background:#222; border-radius:3px; overflow:hidden; margin:4px 0;}
+.fill { height:100%; }
+.prot { background:#c8f060; }
+.carb { background:#f0a060; }
+.fat { background:#a0c8f0; }
+.kcal { background:#d0a0f0; }
 </style>
 </head>
 
@@ -37,99 +35,248 @@ button {
 
 <h1>TRACKER</h1>
 
+<!-- TARGETS -->
 <div class="section">
-<h3>Macros diarios</h3>
-Prot 169 | Carb 180 | Grasas 52 | Kcal 1865
+<b>Macros objetivo</b><br>
+
+Kcal <input id="t-kcal">
+Prot <input id="t-prot">
+Carb <input id="t-carb">
+Grasa <input id="t-fat">
+
+<button onclick="saveTargets()">Guardar</button>
+<div id="targets-view"></div>
 </div>
 
+<!-- MACROS -->
 <div class="section">
-<h3>DÍA 1 - Piernas</h3>
+<b>Macros del día</b><br>
 
-<div class="exercise">
-<b>Sentadilla</b><br>
-
-<input placeholder="fecha" id="fecha-sq">
-<input placeholder="peso" id="peso-sq">
-<input placeholder="series x reps" id="reps-sq">
-<input placeholder="nota" id="nota-sq">
-
-<button onclick="log('sq','work')">+ Trabajo</button>
-<button onclick="log('sq','warm')">+ Warm-up</button>
-
-<div id="log-sq" class="log"></div>
-<div id="sug-sq"></div>
+<div id="macro-bars"></div>
+<div id="macro-alerts"></div>
 </div>
 
-<div class="exercise">
-<b>Prensa</b><br>
+<!-- COMIDA -->
+<div class="section">
+<b>Comida</b><br>
 
-<input placeholder="fecha" id="fecha-pr">
-<input placeholder="peso" id="peso-pr">
-<input placeholder="series x reps" id="reps-pr">
-<input placeholder="nota" id="nota-pr">
+<input id="food-search" placeholder="buscar alimento" oninput="searchFood()">
+<div id="food-results"></div>
 
-<button onclick="log('pr','work')">Guardar</button>
+<div id="selected-food"></div>
 
-<div id="log-pr" class="log"></div>
-<div id="sug-pr"></div>
+Cantidad <input id="food-qty" type="number">
+<button onclick="addFood()">Agregar</button>
+
+<div id="food-log"></div>
 </div>
 
-</div>
+<div id="app"></div>
 
 <script>
+
+// ===== TARGETS =====
+let targets = JSON.parse(localStorage.getItem("targets")||`{"kcal":1865,"protein":169,"carbs":180,"fat":52}`);
+
+function saveTargets(){
+ targets.kcal = +t("t-kcal").value;
+ targets.protein = +t("t-prot").value;
+ targets.carbs = +t("t-carb").value;
+ targets.fat = +t("t-fat").value;
+ localStorage.setItem("targets", JSON.stringify(targets));
+ renderTargets();
+ renderMacros();
+}
+
+function renderTargets(){
+ t("targets-view").innerText =
+ `Kcal ${targets.kcal} | Prot ${targets.protein} | Carb ${targets.carbs} | Grasas ${targets.fat}`;
+
+ t("t-kcal").value = targets.kcal;
+ t("t-prot").value = targets.protein;
+ t("t-carb").value = targets.carbs;
+ t("t-fat").value = targets.fat;
+}
+
+// ===== FOOD LIBRARY =====
+const FOOD = [
+ {name:"pollo", p:31,c:0,f:3.5,k:156},
+ {name:"cuadril", p:30,c:0,f:6,k:178},
+ {name:"atun", p:26,c:0,f:1,k:116},
+ {name:"papa", p:2,c:17,f:0.1,k:77},
+ {name:"arroz", p:2.7,c:28,f:0.3,k:130},
+ {name:"huevo", p:7.5,c:0.5,f:5.5,k:83},
+ {name:"pan avena", p:11.8,c:9.5,f:7.7,k:155}
+];
+
+let selected = null;
+let foodLog = JSON.parse(localStorage.getItem("food")||"[]");
+
+function searchFood(){
+ let q = t("food-search").value.toLowerCase();
+ let res = FOOD.filter(f=>f.name.includes(q));
+
+ t("food-results").innerHTML = res.map(f=>
+ `<div onclick="selectFood('${f.name}')">${f.name}</div>`
+ ).join("");
+}
+
+function selectFood(name){
+ selected = FOOD.find(f=>f.name===name);
+ t("selected-food").innerText = name;
+}
+
+function addFood(){
+ let qty = +t("food-qty").value;
+ if(!selected || !qty) return;
+
+ let factor = qty/100;
+
+ foodLog.push({
+  name:selected.name,
+  p:selected.p*factor,
+  c:selected.c*factor,
+  f:selected.f*factor,
+  k:selected.k*factor
+ });
+
+ localStorage.setItem("food", JSON.stringify(foodLog));
+ renderFood();
+ renderMacros();
+}
+
+function renderFood(){
+ t("food-log").innerHTML = foodLog.map(f=>
+ `<div>${f.name} - ${Math.round(f.k)} kcal</div>`
+ ).join("");
+}
+
+// ===== MACROS =====
+function renderMacros(){
+
+ let total = {p:0,c:0,f:0,k:0};
+
+ foodLog.forEach(f=>{
+  total.p+=f.p;
+  total.c+=f.c;
+  total.f+=f.f;
+  total.k+=f.k;
+ });
+
+ function bar(val,target,cls){
+  let pct = Math.min(val/target*100,100);
+  return `<div class="bar"><div class="fill ${cls}" style="width:${pct}%"></div></div>`;
+ }
+
+ t("macro-bars").innerHTML = `
+ Prot ${Math.round(total.p)}/${targets.protein}
+ ${bar(total.p,targets.protein,'prot')}
+
+ Carb ${Math.round(total.c)}/${targets.carbs}
+ ${bar(total.c,targets.carbs,'carb')}
+
+ Grasas ${Math.round(total.f)}/${targets.fat}
+ ${bar(total.f,targets.fat,'fat')}
+
+ Kcal ${Math.round(total.k)}/${targets.kcal}
+ ${bar(total.k,targets.kcal,'kcal')}
+ `;
+
+ let alert="";
+ if(total.p < targets.protein*0.8) alert+="<div class='bad'>Falta proteína</div>";
+ if(total.f > targets.fat*1.2) alert+="<div class='warn'>Grasa alta</div>";
+
+ t("macro-alerts").innerHTML = alert;
+}
+
+// ===== TRAINING =====
+const ROUTINE = {
+ d1:["squat","prensa"],
+ d2:["dominadas","biceps_barra"],
+ d3:["deadlift"],
+ d4:["pecho"],
+ d5:["hip_thrust"]
+};
+
+const NAMES = {
+ squat:"Sentadilla",
+ prensa:"Prensa",
+ dominadas:"Dominadas",
+ biceps_barra:"Bíceps barra",
+ deadlift:"Peso muerto",
+ pecho:"Pecho",
+ hip_thrust:"Hip thrust"
+};
+
+const WARM = ["squat","deadlift","hip_thrust","biceps_barra"];
 
 let data = JSON.parse(localStorage.getItem("tracker")||"{}");
 
 function log(id,type){
- let f = document.getElementById("fecha-"+id).value;
- let p = document.getElementById("peso-"+id).value;
- let r = document.getElementById("reps-"+id).value;
- let n = document.getElementById("nota-"+id).value;
+ let f = prompt("fecha");
+ let p = prompt("peso");
+ let r = prompt("reps");
+ let n = prompt("nota");
 
  if(!data[id]) data[id]=[];
-
  data[id].push({f,p,r,n,type});
  localStorage.setItem("tracker", JSON.stringify(data));
-
- render(id);
+ render();
 }
 
-function render(id){
- let html="";
- let logs = data[id]||[];
+function evalEx(id){
+ let logs = (data[id]||[]).filter(x=>x.type==="work").slice(-3);
 
- logs.slice(-6).reverse().forEach(l=>{
-   let cls = l.type=="warm" ? "warm" : "";
-   html += `<div class="${cls}">${l.f} - ${l.p}kg - ${l.r} - ${l.n}</div>`;
+ if(logs.length<3) return "";
+
+ let ok = logs.every(l=>(l.n||"").includes("ok"));
+ let cost = logs.some(l=>(l.n||"").includes("cost"));
+
+ if(ok) return "<div class='good'>Subir peso</div>";
+ if(cost) return "<div class='bad'>Mantener</div>";
+ return "";
+}
+
+function render(){
+ let html="";
+
+ Object.keys(ROUTINE).forEach(d=>{
+  html+=`<div class="section"><b>${d.toUpperCase()}</b><br>`;
+
+  ROUTINE[d].forEach(id=>{
+    let logs=(data[id]||[]).slice(-5).reverse();
+
+    html+=`<div class="exercise"><b>${NAMES[id]}</b><br>
+    <button onclick="log('${id}','work')">+ Trabajo</button>`;
+
+    if(WARM.includes(id))
+      html+=`<button onclick="log('${id}','warm')">+ Warm</button>`;
+
+    html+=`<div class="log">`;
+
+    logs.forEach(l=>{
+      html+=`<div class="${l.type==='warm'?'warm':''}">
+      ${l.f} - ${l.p}kg - ${l.r} - ${l.n}
+      </div>`;
+    });
+
+    html+=`</div>${evalEx(id)}</div>`;
+  });
+
+  html+="</div>";
  });
 
- document.getElementById("log-"+id).innerHTML = html;
-
- evaluar(id);
+ t("app").innerHTML=html;
 }
 
-function evaluar(id){
- let logs = (data[id]||[]).filter(l=>l.type=="work").slice(-3);
+// helper
+function t(id){ return document.getElementById(id); }
 
- if(logs.length<3){
-   document.getElementById("sug-"+id).innerHTML="";
-   return;
- }
-
- let ok = logs.every(l=>(l.n||"").toLowerCase().includes("ok"));
- let costo = logs.some(l=>(l.n||"").toLowerCase().includes("cost"));
-
- let msg="";
-
- if(ok) msg="<span class='good'>Subir peso</span>";
- else if(costo) msg="<span class='bad'>Mantener</span>";
- else msg="Seguir";
-
- document.getElementById("sug-"+id).innerHTML=msg;
-}
-
-render("sq");
-render("pr");
+// init
+renderTargets();
+renderFood();
+renderMacros();
+render();
 
 </script>
 
