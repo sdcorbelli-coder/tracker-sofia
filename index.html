@@ -6,33 +6,28 @@
 <title>Tracker Sofía</title>
 
 <style>
-body { font-family: Arial; background:#0e0e0e; color:#fff; padding:20px; }
+body { background:#0e0e0e; color:#fff; font-family:Arial; padding:20px; }
 h1 { color:#c8f060; }
 
 .section {
-  margin-bottom:25px;
-  padding:15px;
   border:1px solid #333;
   border-radius:8px;
+  padding:15px;
+  margin-bottom:20px;
 }
 
-input, button {
-  padding:6px;
-  margin:4px;
-}
+.exercise { margin-bottom:15px; }
 
+input { padding:6px; margin:4px; }
 button {
+  padding:6px 10px;
   background:#c8f060;
   border:none;
   cursor:pointer;
 }
 
-.log {
-  font-size:12px;
-  color:#aaa;
-  margin-top:10px;
-}
-
+.log { font-size:12px; color:#aaa; }
+.warm { color:#888; }
 .good { color:#8cff8c; }
 .bad { color:#ff8c8c; }
 </style>
@@ -44,78 +39,98 @@ button {
 
 <div class="section">
 <h3>Macros diarios</h3>
-<div id="macros"></div>
+Prot 169 | Carb 180 | Grasas 52 | Kcal 1865
 </div>
 
 <div class="section">
-<h3>Sentadilla</h3>
+<h3>DÍA 1 - Piernas</h3>
 
-<input id="peso" placeholder="peso (kg)">
-<input id="nota" placeholder="nota (tecnica ok / costo)">
+<div class="exercise">
+<b>Sentadilla</b><br>
 
-<button onclick="log()">Guardar</button>
+<input placeholder="fecha" id="fecha-sq">
+<input placeholder="peso" id="peso-sq">
+<input placeholder="series x reps" id="reps-sq">
+<input placeholder="nota" id="nota-sq">
 
-<div id="log" class="log"></div>
-<div id="sugerencia"></div>
+<button onclick="log('sq','work')">+ Trabajo</button>
+<button onclick="log('sq','warm')">+ Warm-up</button>
+
+<div id="log-sq" class="log"></div>
+<div id="sug-sq"></div>
+</div>
+
+<div class="exercise">
+<b>Prensa</b><br>
+
+<input placeholder="fecha" id="fecha-pr">
+<input placeholder="peso" id="peso-pr">
+<input placeholder="series x reps" id="reps-pr">
+<input placeholder="nota" id="nota-pr">
+
+<button onclick="log('pr','work')">Guardar</button>
+
+<div id="log-pr" class="log"></div>
+<div id="sug-pr"></div>
+</div>
 
 </div>
 
 <script>
-const target = {p:169,c:180,f:52,k:1865};
 
-document.getElementById("macros").innerText =
-`Prot ${target.p} | Carb ${target.c} | Grasas ${target.f} | Kcal ${target.k}`;
+let data = JSON.parse(localStorage.getItem("tracker")||"{}");
 
-let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+function log(id,type){
+ let f = document.getElementById("fecha-"+id).value;
+ let p = document.getElementById("peso-"+id).value;
+ let r = document.getElementById("reps-"+id).value;
+ let n = document.getElementById("nota-"+id).value;
 
-function log(){
- let peso = document.getElementById("peso").value;
- let nota = document.getElementById("nota").value;
+ if(!data[id]) data[id]=[];
 
- if(!peso) return;
+ data[id].push({f,p,r,n,type});
+ localStorage.setItem("tracker", JSON.stringify(data));
 
- logs.push({peso,nota});
- localStorage.setItem("logs", JSON.stringify(logs));
-
- document.getElementById("peso").value="";
- document.getElementById("nota").value="";
-
- render();
+ render(id);
 }
 
-function render(){
+function render(id){
  let html="";
+ let logs = data[id]||[];
 
- logs.slice(-5).forEach(l=>{
-  html+= `<div>${l.peso} kg - ${l.nota}</div>`;
+ logs.slice(-6).reverse().forEach(l=>{
+   let cls = l.type=="warm" ? "warm" : "";
+   html += `<div class="${cls}">${l.f} - ${l.p}kg - ${l.r} - ${l.n}</div>`;
  });
 
- document.getElementById("log").innerHTML=html;
+ document.getElementById("log-"+id).innerHTML = html;
 
- evaluar();
+ evaluar(id);
 }
 
-function evaluar(){
- let ult = logs.slice(-3);
+function evaluar(id){
+ let logs = (data[id]||[]).filter(l=>l.type=="work").slice(-3);
 
- if(ult.length<3){
-  document.getElementById("sugerencia").innerHTML="";
-  return;
+ if(logs.length<3){
+   document.getElementById("sug-"+id).innerHTML="";
+   return;
  }
 
- let ok = ult.every(l=> (l.nota||"").toLowerCase().includes("ok"));
- let costo = ult.some(l=> (l.nota||"").toLowerCase().includes("cost"));
+ let ok = logs.every(l=>(l.n||"").toLowerCase().includes("ok"));
+ let costo = logs.some(l=>(l.n||"").toLowerCase().includes("cost"));
 
  let msg="";
 
  if(ok) msg="<span class='good'>Subir peso</span>";
  else if(costo) msg="<span class='bad'>Mantener</span>";
- else msg="Seguir igual";
+ else msg="Seguir";
 
- document.getElementById("sugerencia").innerHTML=msg;
+ document.getElementById("sug-"+id).innerHTML=msg;
 }
 
-render();
+render("sq");
+render("pr");
+
 </script>
 
 </body>
